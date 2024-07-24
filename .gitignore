@@ -1,0 +1,17 @@
+.gitignore.txt
+
+bin/
+
+Migrations/
+
+obj/
+
+Properties/
+
+appsettings.json
+
+hospitalBackend.csproj
+
+appsettings.Development.json
+
+hospitalBackend.http
