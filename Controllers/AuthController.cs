@@ -1,4 +1,5 @@
-﻿using hospitalBackend.Models.DB;
+﻿using hospitalBackend.Models.Authorization;
+using hospitalBackend.Models.DB;
 using hospitalBackend.Models.DB.tables;
 using hospitalBackend.Models.DB.viewes;
 using hospitalBackend.Models.Form;
@@ -38,7 +39,7 @@ namespace hospitalBackend.Controllers
         }
 
         [HttpPost]
-        public async Task<IResult> AddPatient([FromBody]AddPatientModel model)
+        public async Task<IResult> AddPatient([FromBody] AddPatientModel model)
         {
             var userForThisTime = _Context.visit_View.Where(x => x.visitTimeID == model.VisitTimeID).SingleOrDefault();
             if (userForThisTime != null)
@@ -125,6 +126,98 @@ namespace hospitalBackend.Controllers
         {
             var times = _Context.visitTime_Tbl.Where(x => x.doctorId == id && x.isActive).ToList();
             return times;
+        }
+
+        [HttpPost("admin/Add")]
+        public async Task<IResult> AddAdmin([FromBody] AddAdminModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                Users_tbl user = new Users_tbl()
+                {
+                    Email = model.Email,
+                    UserName = model.UserName,
+                    PhoneNumber = model.PhoneNumber,
+                    Skill = model.Skill,
+                };
+                var userAdd = await _userManager.CreateAsync(user, model.Password);
+                if (userAdd.Succeeded)
+                {
+                    var lastUser = await _userManager.FindByEmailAsync(model.Email);
+                    string id = lastUser.Id;
+                    var email = _dataProtector.Protect(model.Email);
+
+                    Claim[] AdminClaims = new Claim[] {
+                        new Claim("Admin","Admin"),
+                        new Claim("email",email),
+                        new Claim("id",id),
+                    };
+
+                    foreach (Claim i in AdminClaims)
+                    {
+                        var AddClaim = await _userManager.AddClaimAsync(user,i);
+                        if (!AddClaim.Succeeded) {
+                            return Results.StatusCode(StatusCodes.Status500InternalServerError);
+                        }
+                    }
+                    string Issuer = _configuration["jwt:Issuer"];
+                    string Audience = _configuration["jwt:Audience"];
+                    string key = _configuration["jwt:key"];
+                    byte[] key1 = Encoding.UTF8.GetBytes(key);
+                    var keySecurity = new SymmetricSecurityKey(key1);
+
+                    SigningCredentials credentials = new SigningCredentials(keySecurity, SecurityAlgorithms.HmacSha256);
+                    var token = new JwtSecurityToken(Issuer, Audience, AdminClaims, null, DateTime.Now.AddDays(10), credentials);
+                    var token1 = new JwtSecurityTokenHandler().WriteToken(token);
+                    return Results.Text(token1);
+                }
+                else return Results.StatusCode(StatusCodes.Status500InternalServerError);
+            }
+            else return Results.BadRequest();
+        }
+
+        [HttpPost("admin/token")]
+        public async Task<IResult> AdminLogin([FromBody] AdminLoginModel model)
+        {
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user?.PhoneNumber == model.PhoneNumber)
+            {
+                bool checkPassword = await _userManager.CheckPasswordAsync(user, model.Password);
+                if (checkPassword)
+                {
+                    string Issuer = _configuration["jwt:Issuer"];
+                    string Audience = _configuration["jwt:Audience"];
+                    string key = _configuration["jwt:key"];
+                    byte[] key1 = Encoding.UTF8.GetBytes(key);
+                    var keySecurity = new SymmetricSecurityKey(key1);
+
+                    var lastUser = await _userManager.FindByEmailAsync(model.Email);
+                    string id = lastUser.Id;
+                    var email = _dataProtector.Protect(model.Email);
+
+                    Claim[] AdminClaims = new Claim[] {
+                        new Claim("Admin","Admin"),
+                        new Claim("email",email),
+                        new Claim("id",id),
+                    };
+
+                    SigningCredentials credentials = new SigningCredentials(keySecurity, SecurityAlgorithms.HmacSha256);
+                    var token = new JwtSecurityToken(Issuer, Audience, AdminClaims, null, DateTime.Now.AddDays(10), credentials);
+                    string token1 = new JwtSecurityTokenHandler().WriteToken(token);
+                    return Results.Text(token1);
+                }
+                else return Results.BadRequest();
+            }
+            else return Results.BadRequest();
+        }
+
+        [HttpGet("Admin/patients")]
+        [CheckAdminAuthorization("Admin","Admin")]
+        public void GetPatients()
+        {
+            string emailUser = HttpContext.User.FindFirstValue(ClaimTypes.Email);
+            var email = _dataProtector.Unprotect(emailUser);
+            _logger.Log(LogLevel.Information, email);
         }
     }
 }
