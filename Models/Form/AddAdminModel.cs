@@ -13,7 +13,7 @@ namespace hospitalBackend.Models.Form
         [Required, DataType(DataType.Password)]
         public string Password { get; set; }
         [Required, DataType(DataType.Password), Compare(nameof(Password))]
-        public string ConfrimPhoneNumber { get; set; }
+        public string ConfrimPassword { get; set; }
         [Required,DataType(DataType.Text)]
         public int Skill { get; set; }
     }

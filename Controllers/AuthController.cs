@@ -3,14 +3,12 @@ using hospitalBackend.Models.DB;
 using hospitalBackend.Models.DB.tables;
 using hospitalBackend.Models.DB.viewes;
 using hospitalBackend.Models.Form;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
-using System.Net.Mime;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -128,6 +126,7 @@ namespace hospitalBackend.Controllers
             return times;
         }
 
+        [CheckAdminAuthorization("Manager", "Manager")]
         [HttpPost("admin/Add")]
         public async Task<IResult> AddAdmin([FromBody] AddAdminModel model)
         {
@@ -192,14 +191,7 @@ namespace hospitalBackend.Controllers
                     var keySecurity = new SymmetricSecurityKey(key1);
 
                     var lastUser = await _userManager.FindByEmailAsync(model.Email);
-                    string id = lastUser.Id;
-                    var email = _dataProtector.Protect(model.Email);
-
-                    Claim[] AdminClaims = new Claim[] {
-                        new Claim("Admin","Admin"),
-                        new Claim("email",email),
-                        new Claim("id",id),
-                    };
+                    var AdminClaims = await _userManager.GetClaimsAsync(lastUser);
 
                     SigningCredentials credentials = new SigningCredentials(keySecurity, SecurityAlgorithms.HmacSha256);
                     var token = new JwtSecurityToken(Issuer, Audience, AdminClaims, null, DateTime.Now.AddDays(10), credentials);
