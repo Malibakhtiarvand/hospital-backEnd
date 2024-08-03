@@ -119,9 +119,13 @@ namespace hospitalBackend.Controllers
             return docors;
         }
 
-        [HttpGet("times/{id:guid:required}")]
+        [HttpGet("times/{id:guid}")]
         public List<VisitTime_tbl> getTimesOfDoctor(string id)
         {
+            var Admin = HttpContext.User?.FindFirstValue("id");
+            bool? AdminClaim = HttpContext.User?.HasClaim("Admin","Admin");
+            if (Admin != null && AdminClaim == true) id = Admin;
+
             var times = _Context.visitTime_Tbl.Where(x => x.doctorId == id && x.isActive).ToList();
             return times;
         }
@@ -154,8 +158,9 @@ namespace hospitalBackend.Controllers
 
                     foreach (Claim i in AdminClaims)
                     {
-                        var AddClaim = await _userManager.AddClaimAsync(user,i);
-                        if (!AddClaim.Succeeded) {
+                        var AddClaim = await _userManager.AddClaimAsync(user, i);
+                        if (!AddClaim.Succeeded)
+                        {
                             return Results.StatusCode(StatusCodes.Status500InternalServerError);
                         }
                     }
@@ -204,12 +209,28 @@ namespace hospitalBackend.Controllers
         }
 
         [HttpGet("Admin/patients")]
-        [CheckAdminAuthorization("Admin","Admin")]
-        public void GetPatients()
+        [CheckAdminAuthorization("Admin", "Admin")]
+        public IList<visit_view> GetPatients()
         {
-            string emailUser = HttpContext.User.FindFirstValue(ClaimTypes.Email);
-            var email = _dataProtector.Unprotect(emailUser);
-            _logger.Log(LogLevel.Information, email);
+            var userId = HttpContext.User.FindFirstValue("id");
+            var patientOfDocotr = _Context.visit_View.Where(x => x.DoctorID == userId).ToList();
+            return patientOfDocotr;
+        }
+
+        [HttpPost("Admin/addTime")]
+        [CheckAdminAuthorization("Admin", "Admin")]
+        public async Task AddTimeVisit([FromBody] AddTimeForAdminModel model)
+        {
+            var userId = HttpContext.User.FindFirstValue("id");
+            var user = await _userManager.FindByIdAsync(userId);
+            VisitTime_tbl visitTime_Tbl = new VisitTime_tbl()
+            {
+                doctorId = userId,
+                visitTime = model.time,
+                isActive = true,
+            };
+            _Context.visitTime_Tbl.Add(visitTime_Tbl);
+            _Context.SaveChanges();
         }
     }
 }
