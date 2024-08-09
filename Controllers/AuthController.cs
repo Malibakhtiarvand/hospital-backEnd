@@ -83,15 +83,28 @@ namespace hospitalBackend.Controllers
             return Results.Json(token);
         }
 
-        [HttpGet("CancelVisit")]
-        public void CancelVisit()
+        [HttpDelete("deleteTime/{time:int:required}")]
+        public void DeleteVisit(int time)
         {
-            string userClaims = HttpContext.User.FindFirst(x => x.Type == "data").Value;
-            var decreapt = _dataProtector.Unprotect(userClaims);
-            var json = JsonSerializer.Deserialize<visit_view>(decreapt);
-            var deleteVisit = _Context.Patients_tbl.Where(x => x.Id == json.PatientsID).Single();
+            var timeVisit = _Context.visitTime_Tbl.Where(x => x.Id == time).Single();
+            _Context.visitTime_Tbl.Remove(timeVisit);
+            _Context.SaveChanges();
+        }
+
+        [HttpGet("CancelVisit/{patientID}/{visitTimeId}")]
+        public void CancelVisit(int patientID,int visitTimeId)
+        {
+            if(patientID == null)
+            {
+                string userClaims = HttpContext.User.FindFirst(x => x.Type == "data").Value;
+                var decreapt = _dataProtector.Unprotect(userClaims);
+                var json = JsonSerializer.Deserialize<visit_view>(decreapt);
+                patientID = json.PatientsID;
+                visitTimeId = json.visitTimeID;
+            }
+            var deleteVisit = _Context.Patients_tbl.Where(x => x.Id == patientID).Single();
             _Context.Patients_tbl.Remove(deleteVisit);
-            var visitTime = _Context.visitTime_Tbl.Where(x => x.Id == json.visitTimeID).Single().isActive = true;
+            var visitTime = _Context.visitTime_Tbl.Where(x => x.Id == visitTimeId).Single().isActive = true;
             _Context.SaveChanges();
         }
 
@@ -119,12 +132,12 @@ namespace hospitalBackend.Controllers
             return docors;
         }
 
-        [HttpGet("times/{id:guid}")]
+        [HttpGet("times/{id?}")]
         public List<VisitTime_tbl> getTimesOfDoctor(string id)
         {
             var Admin = HttpContext.User?.FindFirstValue("id");
             bool? AdminClaim = HttpContext.User?.HasClaim("Admin","Admin");
-            if (Admin != null && AdminClaim == true) id = Admin;
+            if (Admin != null && AdminClaim == true && id == "null") id = Admin;
 
             var times = _Context.visitTime_Tbl.Where(x => x.doctorId == id && x.isActive).ToList();
             return times;
